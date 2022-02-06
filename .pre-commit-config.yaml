@@ -8,11 +8,19 @@ repos:
     -   id: check-yaml
     -   id: debug-statements
     -   id: requirements-txt-fixer
-    -   id: double-quote-string-fixer
--   repo: https://github.com/PyCQA/flake8
+    -   id: check-added-large-files
+        args: ['--maxkb=51200']
+-   repo: https://github.com/timothycrosley/isort
+    rev: 5.8.0
+    hooks:
+    -   id: isort
+        args: ["--profile", "black", "--filter-files"]
+-   repo: https://gitlab.com/pycqa/flake8
     rev: 4.0.1
     hooks:
     -   id: flake8
+        entry: bash -c 'flake8 "$@" || true' --
+        verbose: true
         additional_dependencies: [flake8-typing-imports==1.12.0]
 -   repo: https://github.com/psf/black
     rev: 20.8b1
