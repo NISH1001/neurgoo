@@ -106,7 +106,27 @@ class Linear(AbstractLayer):
         return z
 
     def backpropagate(self, grad_accum: Tensor) -> Tensor:
-        raise NotImplementedError()
+        """
+        Backward pass gradient compute.
+
+        Args:
+            grad_accum: ``Tensor``
+                Incoming accumulated gradient from upstream layer
+                This actually represents the "accumulated" gradient
+                in the chain rule till this layer from the last.
+
+        In each backprop, we need to compute 2 things:
+            - find gradient of input grad_accum wrt weights (the main thing)
+            - find gradient of input grad_accum wrt input X to the layer
+
+        """
+        if self.trainable:
+            self.W.grad = self._input_cache @ grad_accum
+            self.b.grad = np.sum(grad_accum, axis=0, keepdims=True)
+
+        # this will be used as a new "grad_accum"
+        # in the previous layer  (n-1)
+        return grad_accum @ self.W.val.T
 
     @property
     def output_shape(self) -> Shape:

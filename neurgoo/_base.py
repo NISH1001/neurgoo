@@ -83,7 +83,7 @@ class AbstractLayer(ABC):
         return self.__classname__
 
     def __str__(self) -> str:
-        return f"Shape: ({self.input_shape}, {self.output_shape}) | trainable: {self.trainable}"
+        return f"{self.__classname__} || Shape: ({self.input_shape}, {self.output_shape}) || trainable: {self.trainable}"
 
 
 class ActivationLayer(AbstractLayer):
@@ -110,18 +110,13 @@ class OptimParam:
     def __init__(
         self, val: Optional[Tensor] = None, requires_grad: bool = True
     ) -> None:
-        self.val = val
-        self.requires_grad = bool(requires_grad)
-        self.grad = Tensor([])
+        self.val: Tensor = val or Tensor(0)
+        self.grad: Tensor = Tensor(0)
+        self.requires_grad: bool = bool(requires_grad)
 
-    def initialize(self):
-        pass
-
-    def backpropagate(self):
-        pass
-
-    def feed_forward(self):
-        pass
+    @property
+    def shape(self) -> Shape:
+        return self.val.shape
 
     @classmethod
     def default_empty(cls) -> OptimParam:
