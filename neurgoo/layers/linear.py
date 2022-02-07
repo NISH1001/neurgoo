@@ -3,6 +3,7 @@
 from typing import Optional, Union
 
 import numpy as np
+from loguru import logger
 
 from .._base import AbstractLayer, OptimParam
 from ..structures import Shape, Tensor
@@ -73,8 +74,13 @@ class Linear(AbstractLayer):
 
     def _initialize_default(self) -> None:
         self.W.val = np.random.randn(self.in_features, self.num_neurons)
-        if self.use_bias:
-            self.b.val = np.random.randn(self.num_neurons)
+        self.b.val = (
+            np.random.randn(self.num_neurons)
+            if self.use_bias
+            else np.zeros(
+                self.num_neurons,
+            )
+        )
 
     def feed_forward(self, X: Tensor) -> Tensor:
         """
@@ -101,6 +107,9 @@ class Linear(AbstractLayer):
         # cache the input for backprop
         self._input_cache = X
         z = X @ self.W.val
+
+        # this improves performance also
+        # instead of adding "zero" biases to z
         if self.use_bias:
             z = z + self.b.val
         return z
@@ -120,12 +129,18 @@ class Linear(AbstractLayer):
             - find gradient of input grad_accum wrt input X to the layer
 
         """
+        if self.debug:
+            logger.debug(f"Input cache shape => {self._input_cache.shape}")
+
         if self.trainable:
-            self.W.grad = self._input_cache @ grad_accum
+            # Should be of the same shape as W
+            self.W.grad = self._input_cache.T @ grad_accum
             self.b.grad = np.sum(grad_accum, axis=0, keepdims=True)
 
         # this will be used as a new "grad_accum"
         # in the previous layer  (n-1)
+        # wrt input
+        # See: how backprop works!
         return grad_accum @ self.W.val.T
 
     @property

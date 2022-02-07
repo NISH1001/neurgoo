@@ -86,6 +86,16 @@ class AbstractLayer(ABC):
         return f"{self.__classname__} || Shape: ({self.input_shape}, {self.output_shape}) || trainable: {self.trainable}"
 
 
+class Activation(ABC):
+    @abstractmethod
+    def __call__(self, x: Tensor) -> Tensor:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def gradient(self, x: Tensor) -> Tensor:
+        raise NotImplementedError()
+
+
 class ActivationLayer(AbstractLayer):
     """
     Defines layer type of "Activation".
@@ -93,7 +103,21 @@ class ActivationLayer(AbstractLayer):
     """
 
     def __init__(self, name: Optional[str] = None) -> None:
-        name = name or self.layer_name
+        self.name = name or self.layer_name
+        self._input_cache = Tensor(0)
+
+    def initialize(self) -> None:
+        pass
+
+    def feed_forward(self, x: Tensor) -> Tensor:
+        self._input_cache = x
+        return self(x)
+
+    def backpropagate(self, grad_accum: Tensor) -> Tensor:
+        return grad_accum * self.gradient(self._input_cache)
+
+    def __str__(self) -> str:
+        return f"{self.__classname__} || Attrs => {self.__dict__}"
 
 
 class LossLayer(AbstractLayer):
