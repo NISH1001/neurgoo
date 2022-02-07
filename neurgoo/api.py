@@ -1,2 +1,2 @@
-from ._base import Tensor
-from .layers import Linear
+from .layers import Identity, Linear
+from .structures import Tensor

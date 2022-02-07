@@ -7,7 +7,7 @@ from typing import Optional
 
 import numpy as np
 
-Tensor = np.ndarray
+from .structures import Shape, Tensor
 
 
 class AbstractLayer(ABC):
@@ -32,13 +32,13 @@ class AbstractLayer(ABC):
     def initialize(self, *args, **kwargs) -> None:
         raise NotImplementedError()
 
-    # @property
-    # def input_shape(self) -> tuple:
-    #     return tuple()
+    @property
+    def output_shape(self) -> Shape:
+        return Shape()
 
     @property
-    def output_shape(self) -> tuple:
-        return tuple()
+    def input_shape(self) -> Shape:
+        return Shape()
 
     @property
     def trainable(self) -> bool:
@@ -57,12 +57,12 @@ class AbstractLayer(ABC):
         return self.feed_forward(X, **kwargs)
 
     @abstractmethod
-    def backpropagate(self, dout: Tensor) -> Tensor:
+    def backpropagate(self, grad_accum: Tensor) -> Tensor:
         """
         Back-propagate the gradient
 
         Args:
-            dout: ``Tensor``
+            grad_accum: ``Tensor``
                 Accumulated gradient wrt the output of the layer.
 
         Returns:
@@ -86,7 +86,7 @@ class AbstractLayer(ABC):
         return f"Shape: ({self.input_shape}, {self.output_shape}) | trainable: {self.trainable}"
 
 
-class AbstractActivation(AbstractLayer):
+class ActivationLayer(AbstractLayer):
     """
     Defines layer type of "Activation".
     New activations should derive from this.
@@ -96,9 +96,22 @@ class AbstractActivation(AbstractLayer):
         name = name or self.layer_name
 
 
-class OptParam(AbstractLayer):
-    def __init__(self, val: Optional[Tensor] = None) -> None:
+class LossLayer(AbstractLayer):
+    def __init__(self, name: Optional[str] = None) -> None:
+        name = name or self.layer_name
+
+
+class OptimParam:
+    """
+    Represents a parameter type that any optimizer can affect
+    for gradient update step.
+    """
+
+    def __init__(
+        self, val: Optional[Tensor] = None, requires_grad: bool = True
+    ) -> None:
         self.val = val
+        self.requires_grad = bool(requires_grad)
         self.grad = Tensor([])
 
     def initialize(self):
@@ -111,8 +124,8 @@ class OptParam(AbstractLayer):
         pass
 
     @classmethod
-    def default_empty(cls) -> OptParam:
-        return cls(np.array([]))
+    def default_empty(cls) -> OptimParam:
+        return cls(np.array([]), requires_grad=True)
 
 
 def main():
