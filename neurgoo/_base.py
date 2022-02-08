@@ -105,7 +105,7 @@ class ActivationLayer(AbstractLayer):
     """
 
     def __init__(self, name: Optional[str] = None, debug: bool = False) -> None:
-        super().__init__(debug=debug)
+        super().__init__(trainable=False, debug=debug)
         self.name = name or self.layer_name
         # setting to 0 for the sake of "tensor consistency"
         # could have done with None
@@ -160,15 +160,27 @@ class OptimParam:
         return cls(np.array([]), requires_grad=True)
 
 
-class AbstractModel(BaseMixin, ABC):
+class AbstractModel(AbstractLayer):
     def __init__(
         self,
         layers: Optional[Sequence[Type[AbstractLayer]]] = None,
         name: Optional[str] = None,
+        trainable: bool = True,
+        debug: bool = False,
     ):
         self.name = name or self.__classname__
+        self.trainable = bool(trainable)
+        self.debug = bool(debug)
+
+        layers = list(layers or [])
         self._sanity_check_layers(layers)
-        self.layers = list(layers) or []
+        self.layers = layers
+
+    def initialize(self) -> None:
+        pass
+
+    def backpropagate(self, grad_accum: Tensor) -> Tensor:
+        raise NotImplementedError("Model doesn't support backprop!")
 
     def _sanity_check_layers(self, layers: Sequence[Type[AbstractLayer]]) -> bool:
         if layers is None:
@@ -196,9 +208,24 @@ class AbstractModel(BaseMixin, ABC):
             self.add_layer(layer)
         return self
 
-    @abstractmethod
     def fit(self, X: Tensor, Y: Tensor) -> Tensor:
         raise NotImplementedError()
+
+    def predict(self, X: Tensor) -> Tensor:
+        return self.feed_forward(X)
+
+    def feed_forward(self, X: Tensor) -> Tensor:
+        for layer in self.layers:
+            X = layer.feed_forward(X)
+        return X
+
+    def __call__(self, X: Tensor) -> Tensor:
+        return self.feed_forward(X)
+
+    def __str__(self) -> str:
+        name = self.name
+        layers_str = "\n".join([str(layer) for layer in self.layers])
+        return f"[Model=({name}, {self.__classname__})]\nnum_layers={len(self.layers)}\nLayers=[\n{layers_str}\n]"
 
 
 def main():
