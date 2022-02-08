@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence, Type, Union
+from typing import Optional, Sequence, Tuple, Type
 
 import numpy as np
 
-from .structures import Shape, Tensor
+from .structures import NULL_TENSOR, Shape, Tensor
 
 
 class BaseMixin:
@@ -138,7 +138,7 @@ class LossLayer(AbstractLayer):
         name = name or self.layer_name
 
 
-class OptimParam:
+class OptimParam(BaseMixin):
     """
     Represents a parameter type that any optimizer can affect
     for gradient update step.
@@ -147,8 +147,8 @@ class OptimParam:
     def __init__(
         self, val: Optional[Tensor] = None, requires_grad: bool = True
     ) -> None:
-        self.val: Tensor = val or Tensor(0)
-        self.grad: Tensor = Tensor(0)
+        self.val: Tensor = val or NULL_TENSOR
+        self.grad: Tensor = NULL_TENSOR
         self.requires_grad: bool = bool(requires_grad)
 
     @property
@@ -158,6 +158,13 @@ class OptimParam:
     @classmethod
     def default_empty(cls) -> OptimParam:
         return cls(np.array([]), requires_grad=True)
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        name = self.__classname__
+        return f"{name} || requires_grad={self.requires_grad} || val_shape = {self.val.shape} || grad_shape = {self.grad.shape}"
 
 
 class AbstractModel(AbstractLayer):
@@ -208,7 +215,8 @@ class AbstractModel(AbstractLayer):
             self.add_layer(layer)
         return self
 
-    def fit(self, X: Tensor, Y: Tensor) -> Tensor:
+    @abstractmethod
+    def fit(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
         raise NotImplementedError()
 
     def predict(self, X: Tensor) -> Tensor:
@@ -219,13 +227,47 @@ class AbstractModel(AbstractLayer):
             X = layer.feed_forward(X)
         return X
 
+    def __getitem__(self, index: int) -> Type[AbstractLayer]:
+        return self.layers[index]
+
     def __call__(self, X: Tensor) -> Tensor:
         return self.feed_forward(X)
+
+    def params(self) -> Tuple[OptimParam]:
+        res = []
+        for layer in self.layers:
+            for var, t in layer.__dict__.items():
+                if isinstance(t, OptimParam):
+                    res.append(getattr(layer, var))
+        return tuple(res)
 
     def __str__(self) -> str:
         name = self.name
         layers_str = "\n".join([str(layer) for layer in self.layers])
         return f"[Model=({name}, {self.__classname__})]\nnum_layers={len(self.layers)}\nLayers=[\n{layers_str}\n]"
+
+
+class AbstractOptimizer(BaseMixin, ABC):
+    def __init__(self, params: Tuple[OptimParam], debug: bool = False) -> None:
+        self._sanity_check_params(params)
+        self.params = params
+        self.debug = bool(debug)
+
+    def _sanity_check_params(self, params: Tuple[OptimParam]) -> bool:
+        assert params is not None
+        if not isinstance(params, tuple):
+            raise TypeError(
+                f"Invalid type for params. Expected tuple. Got {type(params)}"
+            )
+        for i, param in enumerate(params):
+            if not isinstance(param, OptimParam):
+                raise TypeError(
+                    f"Invalid type for param at index={i}. Expected type of OptimParam. Got {type(param)}"
+                )
+
+    @abstractmethod
+    def step(self) -> None:
+        raise NotImplementedError()
 
 
 def main():
