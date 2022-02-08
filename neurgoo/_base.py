@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Sequence, Type, Union
 
 import numpy as np
 
 from .structures import Shape, Tensor
 
 
-class AbstractLayer(ABC):
+class BaseMixin:
+    @property
+    def __classname__(self) -> str:
+        return self.__class__.__name__
+
+
+class AbstractLayer(BaseMixin, ABC):
     """
     This represent an abstract layer from which
     downstream layer classes are implemented
@@ -75,15 +81,21 @@ class AbstractLayer(ABC):
         return 0
 
     @property
-    def __classname__(self) -> str:
-        return self.__class__.__name__
-
-    @property
     def layer_name(self) -> str:
         return self.__classname__
 
     def __str__(self) -> str:
-        return f"Shape: ({self.input_shape}, {self.output_shape}) | trainable: {self.trainable}"
+        return f"{self.__classname__} || Shape: ({self.input_shape}, {self.output_shape}) || trainable: {self.trainable}"
+
+
+class Activation(ABC):
+    @abstractmethod
+    def __call__(self, x: Tensor) -> Tensor:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def gradient(self, x: Tensor) -> Tensor:
+        raise NotImplementedError()
 
 
 class ActivationLayer(AbstractLayer):
@@ -92,8 +104,33 @@ class ActivationLayer(AbstractLayer):
     New activations should derive from this.
     """
 
-    def __init__(self, name: Optional[str] = None) -> None:
-        name = name or self.layer_name
+    def __init__(self, name: Optional[str] = None, debug: bool = False) -> None:
+        super().__init__(debug=debug)
+        self.name = name or self.layer_name
+        # setting to 0 for the sake of "tensor consistency"
+        # could have done with None
+        self._input_cache = Tensor(0)
+
+    def initialize(self) -> None:
+        pass
+
+    @abstractmethod
+    def gradient(self, x: Tensor, **kwargs) -> Tensor:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __call__(self, x: Tensor, **kwargs) -> Tensor:
+        raise NotImplementedError()
+
+    def feed_forward(self, x: Tensor) -> Tensor:
+        self._input_cache = x
+        return self(x)
+
+    def backpropagate(self, grad_accum: Tensor) -> Tensor:
+        return grad_accum * self.gradient(self._input_cache)
+
+    def __str__(self) -> str:
+        return f"{self.__classname__} || Attrs => {self.__dict__}"
 
 
 class LossLayer(AbstractLayer):
@@ -110,22 +147,58 @@ class OptimParam:
     def __init__(
         self, val: Optional[Tensor] = None, requires_grad: bool = True
     ) -> None:
-        self.val = val
-        self.requires_grad = bool(requires_grad)
-        self.grad = Tensor([])
+        self.val: Tensor = val or Tensor(0)
+        self.grad: Tensor = Tensor(0)
+        self.requires_grad: bool = bool(requires_grad)
 
-    def initialize(self):
-        pass
-
-    def backpropagate(self):
-        pass
-
-    def feed_forward(self):
-        pass
+    @property
+    def shape(self) -> Shape:
+        return self.val.shape
 
     @classmethod
     def default_empty(cls) -> OptimParam:
         return cls(np.array([]), requires_grad=True)
+
+
+class AbstractModel(BaseMixin, ABC):
+    def __init__(
+        self,
+        layers: Optional[Sequence[Type[AbstractLayer]]] = None,
+        name: Optional[str] = None,
+    ):
+        self.name = name or self.__classname__
+        self._sanity_check_layers(layers)
+        self.layers = list(layers) or []
+
+    def _sanity_check_layers(self, layers: Sequence[Type[AbstractLayer]]) -> bool:
+        if layers is None:
+            return True
+        if layers is not None and not isinstance(layers, (list, tuple)):
+            raise TypeError(
+                f"Invalid type for layers. Expected any of list, tuple. Got {type(layers)}"
+            )
+        for i, layer in enumerate(layers):
+            if not isinstance(layer, AbstractLayer):
+                raise TypeError(f"Invalid type for [layer={layer}] at [index={i}]")
+        return True
+
+    def add_layer(self, layer: Type[AbstractLayer]) -> Type[AbstractModel]:
+        if not isinstance(layer, AbstractLayer):
+            raise TypeError(
+                f"Invalid type for layer={layer}. Expected a base type of AbstractLayer. Got {type(layer)}"
+            )
+        self.layers.append(layer)
+        return self
+
+    def add_layers(self, layers: Sequence[Type[AbstractLayer]]) -> Type[AbstractModel]:
+        self._sanity_check_layers(layers)
+        for layer in layers:
+            self.add_layer(layer)
+        return self
+
+    @abstractmethod
+    def fit(self, X: Tensor, Y: Tensor) -> Tensor:
+        raise NotImplementedError()
 
 
 def main():
