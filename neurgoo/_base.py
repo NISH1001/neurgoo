@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence, Type, Union
+from typing import Optional, Sequence, Tuple, Type
 
 import numpy as np
 
-from .structures import Shape, Tensor
+from .structures import NULL_TENSOR, Shape, Tensor
 
 
 class BaseMixin:
@@ -105,7 +105,7 @@ class ActivationLayer(AbstractLayer):
     """
 
     def __init__(self, name: Optional[str] = None, debug: bool = False) -> None:
-        super().__init__(debug=debug)
+        super().__init__(trainable=False, debug=debug)
         self.name = name or self.layer_name
         # setting to 0 for the sake of "tensor consistency"
         # could have done with None
@@ -133,12 +133,26 @@ class ActivationLayer(AbstractLayer):
         return f"{self.__classname__} || Attrs => {self.__dict__}"
 
 
-class LossLayer(AbstractLayer):
+class AbstractLoss(BaseMixin, ABC):
     def __init__(self, name: Optional[str] = None) -> None:
-        name = name or self.layer_name
+        name = name or self.__classname__
+
+    @abstractmethod
+    def loss(self, actual: Tensor, predicted: Tensor) -> Tensor:
+        raise NotImplementedError()
+
+    def __call__(self, actual: Tensor, predicted: Tensor) -> Tensor:
+        return self.loss(actual, predicted)
+
+    def feed_forward(self, actual: Tensor, predicted: Tensor) -> Tensor:
+        return self.loss(actual, predicted)
+
+    @abstractmethod
+    def gradient(self, actual: Tensor, predicted: Tensor) -> Tensor:
+        raise NotImplementedError()
 
 
-class OptimParam:
+class OptimParam(BaseMixin):
     """
     Represents a parameter type that any optimizer can affect
     for gradient update step.
@@ -147,8 +161,8 @@ class OptimParam:
     def __init__(
         self, val: Optional[Tensor] = None, requires_grad: bool = True
     ) -> None:
-        self.val: Tensor = val or Tensor(0)
-        self.grad: Tensor = Tensor(0)
+        self.val: Tensor = val or NULL_TENSOR
+        self.grad: Tensor = NULL_TENSOR
         self.requires_grad: bool = bool(requires_grad)
 
     @property
@@ -159,16 +173,32 @@ class OptimParam:
     def default_empty(cls) -> OptimParam:
         return cls(np.array([]), requires_grad=True)
 
+    def __repr__(self) -> str:
+        return str(self)
 
-class AbstractModel(BaseMixin, ABC):
+    def __str__(self) -> str:
+        name = self.__classname__
+        return f"{name} || requires_grad={self.requires_grad} || val_shape = {self.val.shape} || grad_shape = {self.grad.shape}"
+
+
+class AbstractModel(AbstractLayer):
     def __init__(
         self,
         layers: Optional[Sequence[Type[AbstractLayer]]] = None,
         name: Optional[str] = None,
+        trainable: bool = True,
+        debug: bool = False,
     ):
         self.name = name or self.__classname__
+        self.trainable = bool(trainable)
+        self.debug = bool(debug)
+
+        layers = list(layers or [])
         self._sanity_check_layers(layers)
-        self.layers = list(layers) or []
+        self.layers = layers
+
+    def initialize(self) -> None:
+        pass
 
     def _sanity_check_layers(self, layers: Sequence[Type[AbstractLayer]]) -> bool:
         if layers is None:
@@ -196,9 +226,95 @@ class AbstractModel(BaseMixin, ABC):
             self.add_layer(layer)
         return self
 
+    def predict(self, X: Tensor) -> Tensor:
+        return self.feed_forward(X)
+
+    def feed_forward(self, X: Tensor) -> Tensor:
+        for layer in self.layers:
+            X = layer.feed_forward(X)
+        return X
+
+    def __getitem__(self, index: int) -> Type[AbstractLayer]:
+        return self.layers[index]
+
+    def __call__(self, X: Tensor) -> Tensor:
+        return self.feed_forward(X)
+
+    def params(self) -> Tuple[OptimParam]:
+        res = []
+        for layer in self.layers:
+            for var, t in layer.__dict__.items():
+                if isinstance(t, OptimParam):
+                    res.append(getattr(layer, var))
+        return tuple(res)
+
+    def backpropagate(self, grad: Tensor) -> Tensor:
+        for layer in reversed(self.layers):
+            grad = layer.backpropagate(grad)
+        return grad
+
+    def __str__(self) -> str:
+        name = self.name
+        layers_str = "\n".join([str(layer) for layer in self.layers])
+        return f"[Model=({name}, {self.__classname__})]\nnum_layers={len(self.layers)}\nLayers=[\n{layers_str}\n]"
+
+
+class AbstractOptimizer(BaseMixin, ABC):
+    def __init__(self, params: Tuple[OptimParam], debug: bool = False) -> None:
+        self._sanity_check_params(params)
+        self.params = params
+        self.debug = bool(debug)
+
+    def _sanity_check_params(self, params: Tuple[OptimParam]) -> bool:
+        assert params is not None
+        if not isinstance(params, tuple):
+            raise TypeError(
+                f"Invalid type for params. Expected tuple. Got {type(params)}"
+            )
+        for i, param in enumerate(params):
+            if not isinstance(param, OptimParam):
+                raise TypeError(
+                    f"Invalid type for param at index={i}. Expected type of OptimParam. Got {type(param)}"
+                )
+
     @abstractmethod
-    def fit(self, X: Tensor, Y: Tensor) -> Tensor:
+    def step(self) -> None:
         raise NotImplementedError()
+
+
+class AbstractModelTrainer(BaseMixin, ABC):
+    def __init__(
+        self,
+        model: Type[AbstractModel],
+        loss: Type[AbstractLoss],
+        optimizer: Type[AbstractOptimizer],
+    ) -> None:
+        if not isinstance(model, AbstractModel):
+            raise TypeError(
+                f"Invalid type for model. Expected any type of AbstractModel. Got {type(model)}"
+            )
+        self.model = model
+
+        if not isinstance(loss, AbstractLoss):
+            raise TypeError(
+                f"Invalid type for loss. Expected any type of AbstractLoss. Got {type(loss)}"
+            )
+        self.loss = loss
+
+        if not isinstance(optimizer, AbstractOptimizer):
+            raise TypeError(
+                f"Invalid type for optimizer. Expected any type of AbstractOptimizer. Got {type(optimizer)}"
+            )
+        self.optimizer = optimizer
+
+        self.training_losses = []
+
+    @abstractmethod
+    def fit(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
+        raise NotImplementedError()
+
+    def train(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
+        return self.fit(X, Y)
 
 
 def main():
