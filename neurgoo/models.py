@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
-from ._base import AbstractModel
+from ._base import AbstractLoss, AbstractModel, AbstractOptimizer
 from .structures import Tensor
 
 
 class DefaultNNModel(AbstractModel):
-    def fit(self, X: Tensor, Y: Tensor, nepochs: int):
-        raise NotImplementedError()
+    pass
 
 
 def main():

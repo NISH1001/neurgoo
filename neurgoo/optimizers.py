@@ -17,7 +17,6 @@ class SGD(AbstractOptimizer):
 
     def step(self) -> None:
         for param in self.params:
-            print(param.val.shape, param.grad.shape)
             param.val = param.val - self.lr * param.grad
 
 

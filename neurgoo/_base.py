@@ -133,9 +133,23 @@ class ActivationLayer(AbstractLayer):
         return f"{self.__classname__} || Attrs => {self.__dict__}"
 
 
-class LossLayer(AbstractLayer):
+class AbstractLoss(BaseMixin, ABC):
     def __init__(self, name: Optional[str] = None) -> None:
-        name = name or self.layer_name
+        name = name or self.__classname__
+
+    @abstractmethod
+    def loss(self, actual: Tensor, predicted: Tensor) -> Tensor:
+        raise NotImplementedError()
+
+    def __call__(self, actual: Tensor, predicted: Tensor) -> Tensor:
+        return self.loss(actual, predicted)
+
+    def feed_forward(self, actual: Tensor, predicted: Tensor) -> Tensor:
+        return self.loss(actual, predicted)
+
+    @abstractmethod
+    def gradient(self, actual: Tensor, predicted: Tensor) -> Tensor:
+        raise NotImplementedError()
 
 
 class OptimParam(BaseMixin):
@@ -186,9 +200,6 @@ class AbstractModel(AbstractLayer):
     def initialize(self) -> None:
         pass
 
-    def backpropagate(self, grad_accum: Tensor) -> Tensor:
-        raise NotImplementedError("Model doesn't support backprop!")
-
     def _sanity_check_layers(self, layers: Sequence[Type[AbstractLayer]]) -> bool:
         if layers is None:
             return True
@@ -215,10 +226,6 @@ class AbstractModel(AbstractLayer):
             self.add_layer(layer)
         return self
 
-    @abstractmethod
-    def fit(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
-        raise NotImplementedError()
-
     def predict(self, X: Tensor) -> Tensor:
         return self.feed_forward(X)
 
@@ -240,6 +247,11 @@ class AbstractModel(AbstractLayer):
                 if isinstance(t, OptimParam):
                     res.append(getattr(layer, var))
         return tuple(res)
+
+    def backpropagate(self, grad: Tensor) -> Tensor:
+        for layer in reversed(self.layers):
+            grad = layer.backpropagate(grad)
+        return grad
 
     def __str__(self) -> str:
         name = self.name
@@ -268,6 +280,41 @@ class AbstractOptimizer(BaseMixin, ABC):
     @abstractmethod
     def step(self) -> None:
         raise NotImplementedError()
+
+
+class AbstractModelTrainer(BaseMixin, ABC):
+    def __init__(
+        self,
+        model: Type[AbstractModel],
+        loss: Type[AbstractLoss],
+        optimizer: Type[AbstractOptimizer],
+    ) -> None:
+        if not isinstance(model, AbstractModel):
+            raise TypeError(
+                f"Invalid type for model. Expected any type of AbstractModel. Got {type(model)}"
+            )
+        self.model = model
+
+        if not isinstance(loss, AbstractLoss):
+            raise TypeError(
+                f"Invalid type for loss. Expected any type of AbstractLoss. Got {type(loss)}"
+            )
+        self.loss = loss
+
+        if not isinstance(optimizer, AbstractOptimizer):
+            raise TypeError(
+                f"Invalid type for optimizer. Expected any type of AbstractOptimizer. Got {type(optimizer)}"
+            )
+        self.optimizer = optimizer
+
+        self.training_losses = []
+
+    @abstractmethod
+    def fit(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
+        raise NotImplementedError()
+
+    def train(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
+        return self.fit(X, Y)
 
 
 def main():
