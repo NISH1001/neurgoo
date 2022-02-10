@@ -19,10 +19,7 @@ setup(
     author_email="nishanpantha@gmail.com, np0069@uah.edu",
     license="MIT",
     python_requires=">=3.8",
-    packages=[
-        "neurgoo",
-        "neurgoo.layers",
-    ],
+    packages=["neurgoo", "neurgoo.layers", "neurgoo.misc"],
     install_requires=required,
     classifiers=[
         "Intended Audience :: Education",

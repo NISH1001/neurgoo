@@ -308,6 +308,7 @@ class AbstractModelTrainer(BaseMixin, ABC):
         self.optimizer = optimizer
 
         self.training_losses = []
+        self.costs = []
 
     @abstractmethod
     def fit(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:

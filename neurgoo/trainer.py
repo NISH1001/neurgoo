@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+import numpy as np
+
 from ._base import AbstractModelTrainer
-from .structures import Tensor
+from .structures import Tensor, TensorArray
 
 
 class DefaultModelTrainer(AbstractModelTrainer):
@@ -12,6 +14,8 @@ class DefaultModelTrainer(AbstractModelTrainer):
 
             loss = self.loss.loss(Y, predicted)
             losses.append(loss)
+
+            self.costs.append(TensorArray(loss).mean())
 
             grad = self.loss.gradient(Y, predicted)
             self.model.backpropagate(grad)

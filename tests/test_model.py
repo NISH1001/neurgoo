@@ -8,8 +8,9 @@ import numpy as np
 from loguru import logger
 
 from neurgoo.api import Linear, Sigmoid
-from neurgoo.layers.activations import ReLU
-from neurgoo.losses import MeanSquaredError
+from neurgoo.layers.activations import ReLU, Softmax
+from neurgoo.losses import CrossEntropyLoss, MeanSquaredError
+from neurgoo.misc import plot_utils
 from neurgoo.models import DefaultNNModel
 from neurgoo.optimizers import SGD
 from neurgoo.trainer import DefaultModelTrainer
@@ -64,6 +65,46 @@ def test_linear_regression():
     np.testing.assert_almost_equal(errors[-1], 0.0)
 
 
+def test_logistic_regression():
+    # hyperplane is y=x
+    N = 25
+    X, Y = [], []
+    for x in range(-N, N):
+        for y in range(-N, N):
+            if x < y:
+                X.append((x, y))
+                Y.append([1])
+            if x > y:
+                X.append((x, y))
+                Y.append([0])
+
+    X = np.array(X)
+    Y = np.array(Y)
+
+    # import matplotlib.pyplot as plt
+
+    # plt.scatter(X[:, 0], X[:, 1], c=["red" if c else "blue" for c in Y.ravel()])
+    # plt.show()
+    # return
+
+    print(X.shape, Y.shape)
+    model = DefaultNNModel()
+    model.add_layer(Linear(num_neurons=1, in_features=X.shape[1]))
+    model.add_layer(Sigmoid())
+
+    params = model.params()
+    optimizer = SGD(params=params, lr=0.001)
+
+    loss = CrossEntropyLoss()
+    # loss = MeanSquaredError()
+    trainer = DefaultModelTrainer(model=model, optimizer=optimizer, loss=loss)
+
+    errors = trainer.fit(X, Y, nepochs=50)
+    # print(errors[0])
+    plot_utils.plot_losses(trainer.costs)
+    # print(trainer.costs[:30])
+
+
 def test():
     model = DefaultNNModel()
 
@@ -88,7 +129,8 @@ def test():
 
 
 def main():
-    test_linear_regression()
+    # test_linear_regression()
+    test_logistic_regression()
 
 
 if __name__ == "__main__":
