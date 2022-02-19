@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+from loguru import logger
 
 from ._base import AbstractModelTrainer
 from .structures import Tensor, TensorArray
@@ -9,13 +10,17 @@ from .structures import Tensor, TensorArray
 class DefaultModelTrainer(AbstractModelTrainer):
     def fit(self, X: Tensor, Y: Tensor, nepochs: int):
         losses = []
-        for e in range(nepochs):
+        for epoch in range(nepochs):
             predicted = self.model.feed_forward(X)
 
             loss = self.loss.loss(Y, predicted)
             losses.append(loss)
 
-            self.costs.append(TensorArray(loss).mean())
+            current_cost = TensorArray(loss).mean()
+            self.costs.append(current_cost)
+
+            if self.debug:
+                logger.debug(f"Epoch={epoch} | Cost={current_cost}")
 
             grad = self.loss.gradient(Y, predicted)
             self.model.backpropagate(grad)

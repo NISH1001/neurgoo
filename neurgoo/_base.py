@@ -288,7 +288,9 @@ class AbstractModelTrainer(BaseMixin, ABC):
         model: Type[AbstractModel],
         loss: Type[AbstractLoss],
         optimizer: Type[AbstractOptimizer],
+        debug: bool = False,
     ) -> None:
+        self.debug = bool(debug)
         if not isinstance(model, AbstractModel):
             raise TypeError(
                 f"Invalid type for model. Expected any type of AbstractModel. Got {type(model)}"
