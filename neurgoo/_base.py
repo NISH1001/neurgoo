@@ -288,7 +288,9 @@ class AbstractModelTrainer(BaseMixin, ABC):
         model: Type[AbstractModel],
         loss: Type[AbstractLoss],
         optimizer: Type[AbstractOptimizer],
+        debug: bool = False,
     ) -> None:
+        self.debug = bool(debug)
         if not isinstance(model, AbstractModel):
             raise TypeError(
                 f"Invalid type for model. Expected any type of AbstractModel. Got {type(model)}"
@@ -308,6 +310,7 @@ class AbstractModelTrainer(BaseMixin, ABC):
         self.optimizer = optimizer
 
         self.training_losses = []
+        self.costs = []
 
     @abstractmethod
     def fit(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
