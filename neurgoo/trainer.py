@@ -40,6 +40,9 @@ class DefaultModelTrainer(AbstractModelTrainer):
                 self.model.backpropagate(grad)
                 self.optimizer.step()
 
+                # if epoch > 10:
+                #     self.optimizer.lr = 0.01
+
                 loss = self.loss.loss(y_batch, predicted)
                 epoch_costs.append(loss)
 

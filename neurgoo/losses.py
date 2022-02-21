@@ -15,7 +15,7 @@ class MeanSquaredError(AbstractLoss):
 
 
 class CrossEntropyLoss(AbstractLoss):
-    _zero_clipper = 1e-8
+    _zero_clipper = 1e-7
 
     def loss(self, actual: Tensor, predicted: Tensor) -> Tensor:
         return np.mean((-actual * np.log(predicted + self._zero_clipper)).sum(axis=1))

@@ -70,16 +70,26 @@ class Linear(AbstractLayer):
         self.W: OptimParam = OptimParam.default_empty()
         self.b: OptimParam = OptimParam.default_empty()
         self._input_cache = Tensor(0)
+        self.mode = "train"
         self.initialize()
 
     def initialize(self) -> Linear:
         return self._initialize_random()
 
-    def _initialize_random(self) -> Linear:
-        self.W.val = 2 * np.random.random((self.in_features, self.num_neurons)) - 1
-        self.b.val = np.zeros(
-            self.num_neurons,
+    def _initialize_gaussian(self, variance: float = 1.0) -> Linear:
+        self.W.val = np.random.randn(self.in_features, self.num_neurons) * (
+            variance ** 0.5
         )
+        self.b.val = np.zeros((1, self.num_neurons))
+        return self
+
+    def _initialize_random(self) -> Linear:
+        self.W.val = (
+            np.random.rand(self.in_features, self.num_neurons)
+            * (2 ** 0.5)
+            / (self.in_features ** 0.5)
+        )
+        self.b.val = np.zeros((1, self.num_neurons))
         # self.b.val = 2 * np.random.random(self.num_neurons) - 1
 
         # self.b.val = (
@@ -145,12 +155,18 @@ class Linear(AbstractLayer):
         if self.trainable:
             # Should be of the same shape as W
             self.W.grad = self._input_cache.T @ grad_accum
-            self.b.grad = np.sum(grad_accum, axis=0, keepdims=True)
+            # self.b.grad = np.sum(grad_accum, axis=0, keepdims=True)
+            self.b.grad = np.ones((1, grad_accum.shape[0])) @ grad_accum
 
         # this will be used as a new "grad_accum"
         # in the previous layer  (n-1)
         # wrt input
         # See: how backprop works!
+
+        # debug
+        # alpha = 0.001
+        # self.W.val = self.W.val - alpha * self.W.grad
+        # self.b.val = self.b.val - alpha * self.b.grad
         return grad_accum @ self.W.val.T
 
     @property

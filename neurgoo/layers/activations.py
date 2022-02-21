@@ -11,6 +11,7 @@ from ..structures import Tensor
 class ActivationLayer(AbstractLayer):
     def __init__(self):
         self._input_cache = Tensor(0)
+        self.mode = "train"
 
     def initialize(self):
         pass
@@ -77,7 +78,7 @@ class Softmax(ActivationLayer):
         return y
 
     def gradient(self, x: Tensor) -> Tensor:
-        y = self(x)
+        y = self(x + self._zero_clipper)
         return y * (1 - y)
 
 

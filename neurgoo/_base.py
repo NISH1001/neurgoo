@@ -194,9 +194,10 @@ class AbstractModel(AbstractLayer):
         return self.feed_forward(X)
 
     def feed_forward(self, X: Tensor) -> Tensor:
+        out = X
         for layer in self.layers:
-            X = layer.feed_forward(X)
-        return X
+            out = layer.feed_forward(out)
+        return out
 
     def __getitem__(self, index: int) -> Type[AbstractLayer]:
         return self.layers[index]
