@@ -7,6 +7,7 @@ from typing import Optional, Sequence, Tuple, Type
 
 import numpy as np
 
+from .misc.eval import Evaluator
 from .structures import NULL_TENSOR, Shape, Tensor
 
 
@@ -86,51 +87,6 @@ class AbstractLayer(BaseMixin, ABC):
 
     def __str__(self) -> str:
         return f"{self.__classname__} || Shape: ({self.input_shape}, {self.output_shape}) || trainable: {self.trainable}"
-
-
-class Activation(ABC):
-    @abstractmethod
-    def __call__(self, x: Tensor) -> Tensor:
-        raise NotImplementedError()
-
-    @abstractmethod
-    def gradient(self, x: Tensor) -> Tensor:
-        raise NotImplementedError()
-
-
-class ActivationLayer(AbstractLayer):
-    """
-    Defines layer type of "Activation".
-    New activations should derive from this.
-    """
-
-    def __init__(self, name: Optional[str] = None, debug: bool = False) -> None:
-        super().__init__(trainable=False, debug=debug)
-        self.name = name or self.layer_name
-        # setting to 0 for the sake of "tensor consistency"
-        # could have done with None
-        self._input_cache = Tensor(0)
-
-    def initialize(self) -> None:
-        pass
-
-    @abstractmethod
-    def gradient(self, x: Tensor, **kwargs) -> Tensor:
-        raise NotImplementedError()
-
-    @abstractmethod
-    def __call__(self, x: Tensor, **kwargs) -> Tensor:
-        raise NotImplementedError()
-
-    def feed_forward(self, x: Tensor) -> Tensor:
-        self._input_cache = x
-        return self(x)
-
-    def backpropagate(self, grad_accum: Tensor) -> Tensor:
-        return grad_accum * self.gradient(self._input_cache)
-
-    def __str__(self) -> str:
-        return f"{self.__classname__} || Attrs => {self.__dict__}"
 
 
 class AbstractLoss(BaseMixin, ABC):
@@ -288,6 +244,7 @@ class AbstractModelTrainer(BaseMixin, ABC):
         model: Type[AbstractModel],
         loss: Type[AbstractLoss],
         optimizer: Type[AbstractOptimizer],
+        evaluator: Evaluator,
         debug: bool = False,
     ) -> None:
         self.debug = bool(debug)
@@ -311,13 +268,37 @@ class AbstractModelTrainer(BaseMixin, ABC):
 
         self.training_losses = []
         self.costs = []
+        self.evaluator = evaluator
 
     @abstractmethod
-    def fit(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
+    def fit(
+        self,
+        X_train: Tensor,
+        Y_train: Tensor,
+        X_test: Tensor,
+        Y_test: Tensor,
+        nepochs: int,
+        batch_size: int,
+    ) -> Tensor:
         raise NotImplementedError()
 
-    def train(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
-        return self.fit(X, Y)
+    def train(
+        self,
+        X_train: Tensor,
+        Y_train: Tensor,
+        X_test: Tensor,
+        Y_test: Tensor,
+        nepochs: int,
+        batch_size: int,
+    ) -> Tensor:
+        raise self.fit(
+            X_train=X_train,
+            Y_train=Y_train,
+            X_test=X_test,
+            Y_test=Y_test,
+            nepochs=nepochs,
+            batch_size=batch_size,
+        )
 
 
 def main():
