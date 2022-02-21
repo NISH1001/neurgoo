@@ -15,7 +15,6 @@ def plot_losses(losses):
         logger.error("Maplotlib not installed. Halting the plot process!")
         return
     plt.plot(losses)
-    plt.show()
 
 
 def main():

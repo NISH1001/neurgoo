@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from abc import ABC, abstractmethod
 from typing import Optional, Sequence, Tuple, Type
 
@@ -318,6 +319,12 @@ class AbstractModelTrainer(BaseMixin, ABC):
 
     def train(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
         return self.fit(X, Y)
+
+    def _shuffle(self, X: Tensor, Y: Tensor) -> Tuple[Tensor]:
+        n = len(X)
+        indices = list(range(n))
+        random.shuffle(indices)
+        return X[indices], Y[indices]
 
 
 def main():

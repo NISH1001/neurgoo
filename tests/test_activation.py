@@ -20,7 +20,7 @@ def main():
 
     # activation = Sigmoid()
     activation = Softmax()
-    y = activation(X)
+    y = activation.feed_forward(X)
     logger.debug(f"Output shape => {y.shape}")
     logger.info(activation)
     print(isinstance(activation, Activation))
