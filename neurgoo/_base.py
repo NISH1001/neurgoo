@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from abc import ABC, abstractmethod
 from typing import Optional, Sequence, Tuple, Type
 
@@ -34,6 +35,13 @@ class AbstractLayer(BaseMixin, ABC):
     def __init__(self, trainable: bool = True, debug: bool = False) -> None:
         self._trainable = bool(trainable)
         self.debug = bool(debug)
+        self.mode = "train"
+
+    def train_mode(self) -> None:
+        self.mode = "train"
+
+    def eval_mode(self) -> None:
+        self.mode = "eval"
 
     @abstractmethod
     def initialize(self, *args, **kwargs) -> None:
@@ -209,6 +217,14 @@ class AbstractModel(AbstractLayer):
             grad = layer.backpropagate(grad)
         return grad
 
+    def train_mode(self) -> None:
+        for layer in self.layers:
+            layer.train_mode()
+
+    def eval_mode(self) -> None:
+        for layer in self.layers:
+            layer.eval_mode()
+
     def __str__(self) -> str:
         name = self.name
         layers_str = "\n".join([str(layer) for layer in self.layers])
@@ -216,9 +232,16 @@ class AbstractModel(AbstractLayer):
 
 
 class AbstractOptimizer(BaseMixin, ABC):
-    def __init__(self, params: Tuple[OptimParam], debug: bool = False) -> None:
+    def __init__(
+        self, params: Tuple[OptimParam], lr: float = 1e-3, debug: bool = False
+    ) -> None:
         self._sanity_check_params(params)
         self.params = params
+
+        if not isinstance(lr, float):
+            raise TypeError(f"Invalid type for lr. Expected float. Got {type(lr)}")
+        self.lr = lr
+
         self.debug = bool(debug)
 
     def _sanity_check_params(self, params: Tuple[OptimParam]) -> bool:
@@ -299,6 +322,11 @@ class AbstractModelTrainer(BaseMixin, ABC):
             nepochs=nepochs,
             batch_size=batch_size,
         )
+
+    def _shuffle(self, X: Tensor, Y: Tensor) -> Tuple[Tensor]:
+        indices = list(range(len(X)))
+        random.shuffle(indices)
+        return X[indices], Y[indices]
 
 
 def main():

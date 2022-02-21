@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+
+from __future__ import annotations
+
 from typing import Optional, Union
 
 import numpy as np
@@ -66,21 +69,27 @@ class Linear(AbstractLayer):
         self.use_bias = bool(use_bias)
         self.W: OptimParam = OptimParam.default_empty()
         self.b: OptimParam = OptimParam.default_empty()
-        self._input_cache = None
+        self._input_cache = Tensor(0)
         self.initialize()
 
-    def initialize(self) -> None:
-        self._initialize_default()
+    def initialize(self) -> Linear:
+        return self._initialize_random()
 
-    def _initialize_default(self) -> None:
-        self.W.val = np.random.randn(self.in_features, self.num_neurons)
-        self.b.val = (
-            np.random.randn(self.num_neurons)
-            if self.use_bias
-            else np.zeros(
-                self.num_neurons,
-            )
+    def _initialize_random(self) -> Linear:
+        self.W.val = 2 * np.random.random((self.in_features, self.num_neurons)) - 1
+        self.b.val = np.zeros(
+            self.num_neurons,
         )
+        # self.b.val = 2 * np.random.random(self.num_neurons) - 1
+
+        # self.b.val = (
+        #     np.random.randn(self.num_neurons)
+        #     if self.use_bias
+        #     else np.zeros(
+        #         self.num_neurons,
+        #     )
+        # )
+        return self
 
     def feed_forward(self, X: Tensor) -> Tensor:
         """
@@ -105,7 +114,8 @@ class Linear(AbstractLayer):
             not be used in the forward pass.
         """
         # cache the input for backprop
-        self._input_cache = X
+        if self.mode == "train":
+            self._input_cache = X
         z = X @ self.W.val
 
         # this improves performance also

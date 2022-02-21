@@ -24,13 +24,9 @@ class DefaultModelTrainer(AbstractModelTrainer):
         logger.info(f"Training | nepochs={nepochs} | batch_size={batch_size}")
         losses = []
         for epoch in range(nepochs):
-            # if epoch_shuffle:
-            #     X_train, Y_train = self._shuffle(X_train, Y_train)
-
-            indices = np.arange(len(X_train))
-            np.random.shuffle(indices)
-            X_train = X_train[indices]
-            Y_train = Y_train[indices]
+            self.model.train_mode()
+            if epoch_shuffle:
+                X_train, Y_train = self._shuffle(X_train, Y_train)
 
             start = time.time()
             epoch_costs = []
@@ -50,6 +46,7 @@ class DefaultModelTrainer(AbstractModelTrainer):
                 # if self.debug:
                 #     logger.debug(f"Epoch={epoch} | Batch={i} | Batch Cost={cost}")
 
+            self.model.eval_mode()
             current_cost = np.mean(epoch_costs)
             self.costs.append(current_cost)
 

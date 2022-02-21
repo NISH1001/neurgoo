@@ -16,7 +16,8 @@ class ActivationLayer(AbstractLayer):
         pass
 
     def feed_forward(self, x):
-        self._input_cache = x
+        if self.mode == "train":
+            self._input_cache = x
         return self(x)
 
     def __call__(self, x):
