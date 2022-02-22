@@ -40,26 +40,20 @@ class DefaultModelTrainer(AbstractModelTrainer):
                 self.model.backpropagate(grad)
                 self.optimizer.step()
 
-                # if epoch > 10:
-                #     self.optimizer.lr = 0.01
-
                 loss = self.loss.loss(y_batch, predicted)
                 epoch_costs.append(loss)
 
                 # if self.debug:
                 #     logger.debug(f"Epoch={epoch} | Batch={i} | Batch Cost={cost}")
 
-                test_acc = (
-                    np.sum(
-                        np.argmax(
-                            self.model.predict(X_test),
-                            axis=1,
-                        )
-                        == np.argmax(Y_test, axis=1)
-                    )
-                    / len(X_test)
-                )
-                print(test_acc)
+                # test_acc = np.sum(
+                #     np.argmax(
+                #         self.model.predict(X_test),
+                #         axis=1,
+                #     )
+                #     == np.argmax(Y_test, axis=1)
+                # ) / len(X_test)
+                # print(test_acc)
 
             self.model.eval_mode()
             current_cost = np.mean(epoch_costs)

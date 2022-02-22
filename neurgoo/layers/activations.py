@@ -5,12 +5,12 @@ from typing import Optional
 import numpy as np
 
 from .._base import AbstractLayer, BaseMixin
-from ..structures import Tensor
+from ..structures import NULL_TENSOR, Tensor
 
 
 class ActivationLayer(AbstractLayer):
     def __init__(self):
-        self._input_cache = Tensor(0)
+        self._input_cache = NULL_TENSOR.copy()
         self.mode = "train"
 
     def initialize(self):
@@ -19,6 +19,9 @@ class ActivationLayer(AbstractLayer):
     def feed_forward(self, x):
         if self.mode == "train":
             self._input_cache = x
+            self.trainable = True
+        elif self.mode == "eval":
+            self.trainable = False
         return self(x)
 
     def __call__(self, x):
@@ -62,20 +65,19 @@ class LeakyReLU(ActivationLayer):
         self.leak = leak
 
     def __call__(self, x: Tensor) -> Tensor:
-        return np.where(x > 0, x, self.leak)
+        return np.where(x > 0, x, x * self.leak)
 
     def gradient(self, x: Tensor) -> Tensor:
         return np.where(x > 0, 1, self.leak)
 
 
 class Softmax(ActivationLayer):
-    _zero_clipper = 1e-7
+    _zero_clipper = 1e-13
 
     def __call__(self, x: Tensor) -> Tensor:
         sx = x - np.max(x, axis=1).reshape(-1, 1)
         exps = np.exp(sx)
-        y = exps / np.sum(exps, axis=1).reshape(-1, 1)
-        return y
+        return exps / np.sum(exps, axis=1).reshape(-1, 1)
 
     def gradient(self, x: Tensor) -> Tensor:
         y = self(x + self._zero_clipper)

@@ -38,9 +38,11 @@ class AbstractLayer(BaseMixin, ABC):
         self.mode = "train"
 
     def train_mode(self) -> None:
+        self.trainable = True
         self.mode = "train"
 
     def eval_mode(self) -> None:
+        self.trainable = False
         self.mode = "eval"
 
     @abstractmethod
@@ -194,10 +196,9 @@ class AbstractModel(AbstractLayer):
         return self.feed_forward(X)
 
     def feed_forward(self, X: Tensor) -> Tensor:
-        out = X
         for layer in self.layers:
-            out = layer.feed_forward(out)
-        return out
+            X = layer.feed_forward(X)
+        return X
 
     def __getitem__(self, index: int) -> Type[AbstractLayer]:
         return self.layers[index]
@@ -219,10 +220,12 @@ class AbstractModel(AbstractLayer):
         return grad
 
     def train_mode(self) -> None:
+        self.trainable = True
         for layer in self.layers:
             layer.train_mode()
 
     def eval_mode(self) -> None:
+        self.trainable = False
         for layer in self.layers:
             layer.eval_mode()
 

@@ -15,18 +15,15 @@ class MeanSquaredError(AbstractLoss):
 
 
 class CrossEntropyLoss(AbstractLoss):
-    _zero_clipper = 1e-7
+    _zero_clipper = 1e-15
 
     def loss(self, actual: Tensor, predicted: Tensor) -> Tensor:
         return np.mean((-actual * np.log(predicted + self._zero_clipper)).sum(axis=1))
 
     def gradient(self, actual: Tensor, predicted: Tensor) -> Tensor:
-        return -actual / ((predicted + self._zero_clipper) * len(actual))
-
-    # def gradient(self, actual: Tensor, predicted: Tensor) -> Tensor:
-    #     return -(actual - predicted) / (
-    #         predicted * (1 - predicted) + self._zero_clipper
-    #     )
+        zc = self._zero_clipper
+        # return -(actual / (predicted + zc)) + (1 - actual) / (1 - predicted + zc)
+        return -actual / (predicted + zc)
 
 
 def main():

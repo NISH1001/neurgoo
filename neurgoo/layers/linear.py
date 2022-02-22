@@ -74,31 +74,21 @@ class Linear(AbstractLayer):
         self.initialize()
 
     def initialize(self) -> Linear:
-        return self._initialize_random()
+        return self.initialize_uniform()
 
-    def _initialize_gaussian(self, variance: float = 1.0) -> Linear:
+    def initialize_gaussian(self, variance: float = 1.0) -> Linear:
         self.W.val = np.random.randn(self.in_features, self.num_neurons) * (
             variance ** 0.5
         )
         self.b.val = np.zeros((1, self.num_neurons))
         return self
 
-    def _initialize_random(self) -> Linear:
-        self.W.val = (
-            np.random.rand(self.in_features, self.num_neurons)
-            * (2 ** 0.5)
-            / (self.in_features ** 0.5)
+    def initialize_uniform(self) -> Linear:
+        limit = 1 / np.sqrt(self.in_features)
+        self.W.val = np.random.uniform(
+            -limit, limit, (self.in_features, self.num_neurons)
         )
         self.b.val = np.zeros((1, self.num_neurons))
-        # self.b.val = 2 * np.random.random(self.num_neurons) - 1
-
-        # self.b.val = (
-        #     np.random.randn(self.num_neurons)
-        #     if self.use_bias
-        #     else np.zeros(
-        #         self.num_neurons,
-        #     )
-        # )
         return self
 
     def feed_forward(self, X: Tensor) -> Tensor:
@@ -155,8 +145,8 @@ class Linear(AbstractLayer):
         if self.trainable:
             # Should be of the same shape as W
             self.W.grad = self._input_cache.T @ grad_accum
-            # self.b.grad = np.sum(grad_accum, axis=0, keepdims=True)
-            self.b.grad = np.ones((1, grad_accum.shape[0])) @ grad_accum
+            self.b.grad = np.sum(grad_accum, axis=0, keepdims=True)
+            # self.b.grad = np.ones((1, grad_accum.shape[0])) @ grad_accum
 
         # this will be used as a new "grad_accum"
         # in the previous layer  (n-1)
