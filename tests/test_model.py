@@ -5,6 +5,7 @@ import sys
 sys.path.append("../neurgoo/")
 
 import numpy as np
+import tensorflow as tf
 from loguru import logger
 from sklearn.model_selection import train_test_split
 
@@ -137,6 +138,74 @@ def test_logistic_regression():
     print("<=== EVAL ===")
 
 
+def test_xor():
+    # hyperplane is y=x
+    N = 25
+    X, Y = [], []
+    for i in range(5000):
+        for j in range(2):
+            for k in range(2):
+                X.append((j, k))
+                Y.append(j ^ k)
+
+    X = np.array(X)
+    Y = np.array(Y)
+    Y = tf.keras.utils.to_categorical(Y)
+
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, train_size=0.8)
+    logger.debug(f"X_train shape => {X_train.shape}")
+    logger.debug(f"X_test shape => {X_test.shape}")
+
+    # import matplotlib.pyplot as plt
+
+    # plt.scatter(X[:, 0], X[:, 1], c=["red" if c else "blue" for c in Y.ravel()])
+    # plt.show()
+    # return
+
+    model = DefaultNNModel()
+    model.add_layer(Linear(num_neurons=10, in_features=X.shape[1]))
+    model.add_layer(ReLU())
+    model.add_layer(Linear(num_neurons=2, in_features=10))
+    model.add_layer(Softmax())
+
+    params = model.params()
+    optimizer = SGD(params=params, lr=0.001)
+
+    loss = CrossEntropyLoss()
+    # loss = MeanSquaredError()
+    evaluator = evaltools.Evaluator(num_classes=2)
+    trainer = DefaultModelTrainer(
+        model=model, optimizer=optimizer, loss=loss, debug=True, evaluator=evaluator
+    )
+
+    errors = trainer.fit(
+        X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test, nepochs=50
+    )
+    # print(errors[0])
+    # plot_utils.plot_losses(trainer.costs)
+    # print(trainer.costs[:30])
+
+    # print("=== EVAL === >")
+    # predictions = model.predict(X_test)
+    # # for binary classification, it's fine to do this!
+    # predictions = predictions.reshape(-1)
+    # logger.debug(predictions[:10])
+    # predictions[predictions < 0.5] = 0
+    # predictions[predictions >= 0.5] = 1
+    # predictions = predictions.astype(int)
+    # logger.debug(f"predictions shape => {predictions.shape}")
+    # logger.debug(predictions[:10])
+
+    # gts = Y_test.reshape(-1).astype(int)
+    # evaluator = evaltools.Evaluator(num_classes=2)
+    # cm, p, r = evaluator.calculate_metrics(gts, predictions)
+    # accuracy = evaluator.calculate_accuracy(gts, predictions)
+
+    # logger.debug(f"Confusion Matrix => \n{cm}")
+    # logger.debug(f"Precision : {p} | Recall: {r} | Accuracy: {accuracy}")
+    # print("<=== EVAL ===")
+
+
 def test():
     model = DefaultNNModel()
 
@@ -162,7 +231,8 @@ def test():
 
 def main():
     # test_linear_regression()
-    test_logistic_regression()
+    # test_logistic_regression()
+    test_xor()
 
 
 if __name__ == "__main__":

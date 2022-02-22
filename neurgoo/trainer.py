@@ -49,6 +49,18 @@ class DefaultModelTrainer(AbstractModelTrainer):
                 # if self.debug:
                 #     logger.debug(f"Epoch={epoch} | Batch={i} | Batch Cost={cost}")
 
+                test_acc = (
+                    np.sum(
+                        np.argmax(
+                            self.model.predict(X_test),
+                            axis=1,
+                        )
+                        == np.argmax(Y_test, axis=1)
+                    )
+                    / len(X_test)
+                )
+                print(test_acc)
+
             self.model.eval_mode()
             current_cost = np.mean(epoch_costs)
             self.costs.append(current_cost)
