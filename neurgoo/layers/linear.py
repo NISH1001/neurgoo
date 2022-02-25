@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+
+from __future__ import annotations
+
 from typing import Optional, Union
 
 import numpy as np
@@ -66,21 +69,27 @@ class Linear(AbstractLayer):
         self.use_bias = bool(use_bias)
         self.W: OptimParam = OptimParam.default_empty()
         self.b: OptimParam = OptimParam.default_empty()
-        self._input_cache = None
+        self._input_cache = Tensor(0)
+        self.mode = "train"
         self.initialize()
 
-    def initialize(self) -> None:
-        self._initialize_default()
+    def initialize(self) -> Linear:
+        return self.initialize_uniform()
 
-    def _initialize_default(self) -> None:
-        self.W.val = np.random.randn(self.in_features, self.num_neurons)
-        self.b.val = (
-            np.random.randn(self.num_neurons)
-            if self.use_bias
-            else np.zeros(
-                self.num_neurons,
-            )
+    def initialize_gaussian(self, variance: float = 1.0) -> Linear:
+        self.W.val = np.random.randn(self.in_features, self.num_neurons) * (
+            variance ** 0.5
         )
+        self.b.val = np.zeros((1, self.num_neurons))
+        return self
+
+    def initialize_uniform(self) -> Linear:
+        limit = 1 / np.sqrt(self.in_features)
+        self.W.val = np.random.uniform(
+            -limit, limit, (self.in_features, self.num_neurons)
+        )
+        self.b.val = np.zeros((1, self.num_neurons))
+        return self
 
     def feed_forward(self, X: Tensor) -> Tensor:
         """
@@ -105,7 +114,8 @@ class Linear(AbstractLayer):
             not be used in the forward pass.
         """
         # cache the input for backprop
-        self._input_cache = X
+        if self.mode == "train":
+            self._input_cache = X
         z = X @ self.W.val
 
         # this improves performance also
@@ -136,11 +146,17 @@ class Linear(AbstractLayer):
             # Should be of the same shape as W
             self.W.grad = self._input_cache.T @ grad_accum
             self.b.grad = np.sum(grad_accum, axis=0, keepdims=True)
+            # self.b.grad = np.ones((1, grad_accum.shape[0])) @ grad_accum
 
         # this will be used as a new "grad_accum"
         # in the previous layer  (n-1)
         # wrt input
         # See: how backprop works!
+
+        # debug
+        # alpha = 0.001
+        # self.W.val = self.W.val - alpha * self.W.grad
+        # self.b.val = self.b.val - alpha * self.b.grad
         return grad_accum @ self.W.val.T
 
     @property

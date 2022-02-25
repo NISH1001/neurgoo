@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import random
 from abc import ABC, abstractmethod
 from typing import Optional, Sequence, Tuple, Type
 
 import numpy as np
 
+from .misc.eval import Evaluator
 from .structures import NULL_TENSOR, Shape, Tensor
 
 
@@ -33,6 +35,15 @@ class AbstractLayer(BaseMixin, ABC):
     def __init__(self, trainable: bool = True, debug: bool = False) -> None:
         self._trainable = bool(trainable)
         self.debug = bool(debug)
+        self.mode = "train"
+
+    def train_mode(self) -> None:
+        self.trainable = True
+        self.mode = "train"
+
+    def eval_mode(self) -> None:
+        self.trainable = False
+        self.mode = "eval"
 
     @abstractmethod
     def initialize(self, *args, **kwargs) -> None:
@@ -86,51 +97,6 @@ class AbstractLayer(BaseMixin, ABC):
 
     def __str__(self) -> str:
         return f"{self.__classname__} || Shape: ({self.input_shape}, {self.output_shape}) || trainable: {self.trainable}"
-
-
-class Activation(ABC):
-    @abstractmethod
-    def __call__(self, x: Tensor) -> Tensor:
-        raise NotImplementedError()
-
-    @abstractmethod
-    def gradient(self, x: Tensor) -> Tensor:
-        raise NotImplementedError()
-
-
-class ActivationLayer(AbstractLayer):
-    """
-    Defines layer type of "Activation".
-    New activations should derive from this.
-    """
-
-    def __init__(self, name: Optional[str] = None, debug: bool = False) -> None:
-        super().__init__(trainable=False, debug=debug)
-        self.name = name or self.layer_name
-        # setting to 0 for the sake of "tensor consistency"
-        # could have done with None
-        self._input_cache = Tensor(0)
-
-    def initialize(self) -> None:
-        pass
-
-    @abstractmethod
-    def gradient(self, x: Tensor, **kwargs) -> Tensor:
-        raise NotImplementedError()
-
-    @abstractmethod
-    def __call__(self, x: Tensor, **kwargs) -> Tensor:
-        raise NotImplementedError()
-
-    def feed_forward(self, x: Tensor) -> Tensor:
-        self._input_cache = x
-        return self(x)
-
-    def backpropagate(self, grad_accum: Tensor) -> Tensor:
-        return grad_accum * self.gradient(self._input_cache)
-
-    def __str__(self) -> str:
-        return f"{self.__classname__} || Attrs => {self.__dict__}"
 
 
 class AbstractLoss(BaseMixin, ABC):
@@ -253,6 +219,16 @@ class AbstractModel(AbstractLayer):
             grad = layer.backpropagate(grad)
         return grad
 
+    def train_mode(self) -> None:
+        self.trainable = True
+        for layer in self.layers:
+            layer.train_mode()
+
+    def eval_mode(self) -> None:
+        self.trainable = False
+        for layer in self.layers:
+            layer.eval_mode()
+
     def __str__(self) -> str:
         name = self.name
         layers_str = "\n".join([str(layer) for layer in self.layers])
@@ -260,9 +236,16 @@ class AbstractModel(AbstractLayer):
 
 
 class AbstractOptimizer(BaseMixin, ABC):
-    def __init__(self, params: Tuple[OptimParam], debug: bool = False) -> None:
+    def __init__(
+        self, params: Tuple[OptimParam], lr: float = 1e-3, debug: bool = False
+    ) -> None:
         self._sanity_check_params(params)
         self.params = params
+
+        if not isinstance(lr, float):
+            raise TypeError(f"Invalid type for lr. Expected float. Got {type(lr)}")
+        self.lr = lr
+
         self.debug = bool(debug)
 
     def _sanity_check_params(self, params: Tuple[OptimParam]) -> bool:
@@ -288,6 +271,7 @@ class AbstractModelTrainer(BaseMixin, ABC):
         model: Type[AbstractModel],
         loss: Type[AbstractLoss],
         optimizer: Type[AbstractOptimizer],
+        evaluator: Evaluator,
         debug: bool = False,
     ) -> None:
         self.debug = bool(debug)
@@ -311,13 +295,42 @@ class AbstractModelTrainer(BaseMixin, ABC):
 
         self.training_losses = []
         self.costs = []
+        self.evaluator = evaluator
 
     @abstractmethod
-    def fit(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
+    def fit(
+        self,
+        X_train: Tensor,
+        Y_train: Tensor,
+        X_test: Tensor,
+        Y_test: Tensor,
+        nepochs: int,
+        batch_size: int,
+    ) -> Tensor:
         raise NotImplementedError()
 
-    def train(self, X: Tensor, Y: Tensor, nepochs: int) -> Tensor:
-        return self.fit(X, Y)
+    def train(
+        self,
+        X_train: Tensor,
+        Y_train: Tensor,
+        X_test: Tensor,
+        Y_test: Tensor,
+        nepochs: int,
+        batch_size: int,
+    ) -> Tensor:
+        raise self.fit(
+            X_train=X_train,
+            Y_train=Y_train,
+            X_test=X_test,
+            Y_test=Y_test,
+            nepochs=nepochs,
+            batch_size=batch_size,
+        )
+
+    def _shuffle(self, X: Tensor, Y: Tensor) -> Tuple[Tensor]:
+        indices = list(range(len(X)))
+        random.shuffle(indices)
+        return X[indices], Y[indices]
 
 
 def main():

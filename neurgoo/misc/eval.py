@@ -5,6 +5,10 @@ import numpy as np
 from ..structures import Tensor
 
 
+def convert_prob_to_label(y):
+    return np.argmax(y, axis=1).reshape((len(y), 1))
+
+
 class Evaluator:
     def __init__(self, num_classes: int = 10):
         assert isinstance(num_classes, int)

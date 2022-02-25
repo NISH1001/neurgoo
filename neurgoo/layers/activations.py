@@ -1,12 +1,43 @@
 #!/usr/bin/env python3
 
+from typing import Optional
+
 import numpy as np
 
-from .._base import Activation, ActivationLayer
-from ..structures import Tensor
+from .._base import AbstractLayer, BaseMixin
+from ..structures import NULL_TENSOR, Tensor
 
 
-class Sigmoid(Activation, ActivationLayer):
+class ActivationLayer(AbstractLayer):
+    def __init__(self):
+        self._input_cache = NULL_TENSOR.copy()
+        self.mode = "train"
+
+    def initialize(self):
+        pass
+
+    def feed_forward(self, x):
+        if self.mode == "train":
+            self._input_cache = x
+            self.trainable = True
+        elif self.mode == "eval":
+            self.trainable = False
+        return self(x)
+
+    def __call__(self, x):
+        raise NotImplementedError()
+
+    def backpropagate(self, grad_accum: Tensor) -> Tensor:
+        return grad_accum * self.gradient(self._input_cache)
+
+    def gradient(self, x: Tensor) -> Tensor:
+        raise NotImplementedError()
+
+    def __str__(self) -> str:
+        return f"{self.__classname__} || Attrs => {self.__dict__}"
+
+
+class Sigmoid(ActivationLayer):
     def __call__(self, x: Tensor) -> Tensor:
         return 1.0 / (1.0 + np.exp(-x))
 
@@ -15,7 +46,7 @@ class Sigmoid(Activation, ActivationLayer):
         return y * (1 - y)
 
 
-class ReLU(Activation, ActivationLayer):
+class ReLU(ActivationLayer):
     def __call__(self, x: Tensor) -> Tensor:
         return np.where(x >= 0, x, 0)
 
@@ -23,9 +54,9 @@ class ReLU(Activation, ActivationLayer):
         return np.where(x >= 0, 1, 0)
 
 
-class LeakyReLU(Activation, ActivationLayer):
+class LeakyReLU(ActivationLayer):
     def __init__(self, leak: float = 1e-5, name=None, debug: bool = False) -> None:
-        super().__init__(name=name, debug=debug)
+        super().__init__()
 
         if not isinstance(leak, float):
             raise TypeError(
@@ -34,49 +65,22 @@ class LeakyReLU(Activation, ActivationLayer):
         self.leak = leak
 
     def __call__(self, x: Tensor) -> Tensor:
-        return np.where(x > 0, x, self.leak)
+        return np.where(x > 0, x, x * self.leak)
 
     def gradient(self, x: Tensor) -> Tensor:
         return np.where(x > 0, 1, self.leak)
 
 
-class Softmax(Activation, ActivationLayer):
-    """
-    With axis=1, apply softmax for each row
-    """
-
-    def __init__(self, theta: float = 1.0, axis: int = 1) -> None:
-        self.theta = theta
-        self.axis = axis
+class Softmax(ActivationLayer):
+    _zero_clipper = 1e-13
 
     def __call__(self, x: Tensor) -> Tensor:
-        # make X at least 2d
-        y = np.atleast_2d(x)
-
-        # find axis
-        axis = self.axis
-        if axis is None:
-            axis = next(j[0] for j in enumerate(y.shape) if j[1] > 1)
-
-        y = y * float(self.theta)
-
-        # subtract the max for numerical stability
-        y = y - np.expand_dims(np.max(y, axis=axis), axis)
-        y = np.exp(y)
-
-        # take the sum along the specified axis
-        ax_sum = np.expand_dims(np.sum(y, axis=axis), axis)
-
-        p = y / ax_sum
-
-        # flatten if X was 1D
-        if len(x.shape) == 1:
-            p = p.flatten()
-
-        return p
+        sx = x - np.max(x, axis=1).reshape(-1, 1)
+        exps = np.exp(sx)
+        return exps / np.sum(exps, axis=1).reshape(-1, 1)
 
     def gradient(self, x: Tensor) -> Tensor:
-        y = self(x)
+        y = self(x + self._zero_clipper)
         return y * (1 - y)
 
 
