@@ -8,7 +8,7 @@ from loguru import logger
 from ._base import AbstractModelTrainer
 from .layers.activations import ActivationLayer, Softmax
 from .losses import CrossEntropyLossWithLogits
-from .misc import eval as neuroeval
+from .misc.eval import EvalData
 from .structures import Tensor, TensorArray
 
 
@@ -17,6 +17,8 @@ class DefaultModelTrainer(AbstractModelTrainer):
         self,
         X_train: Tensor,
         Y_train: Tensor,
+        X_val: Tensor,
+        Y_val: Tensor,
         X_test: Tensor,
         Y_test: Tensor,
         nepochs: int,
@@ -25,7 +27,9 @@ class DefaultModelTrainer(AbstractModelTrainer):
     ):
         logger.info(f"Training | nepochs={nepochs} | batch_size={batch_size}")
         losses = []
-        for epoch in range(nepochs):
+        grand_time = time.time()
+        history = dict(train=[], val=[], test=EvalData.default_empty())
+        for epoch in range(1, nepochs + 1):
             self.model.train_mode()
             if epoch_shuffle:
                 X_train, Y_train = self._shuffle(X_train, Y_train)
@@ -45,63 +49,41 @@ class DefaultModelTrainer(AbstractModelTrainer):
                 loss = self.loss.loss(y_batch, predicted)
                 epoch_costs.append(loss)
 
-                # if self.debug:
-                #     logger.debug(f"Epoch={epoch} | Batch={i} | Batch Cost={cost}")
-
-                # test_acc = np.sum(
-                #     np.argmax(
-                #         self.model.predict(X_test),
-                #         axis=1,
-                #     )
-                #     == np.argmax(Y_test, axis=1)
-                # ) / len(X_test)
-                # print(test_acc)
+                if self.debug:
+                    train_acc_batch = self.evaluator.calculate_accuracy(
+                        y_batch, (self.model.predict(x_batch))
+                    )
+                    logger.debug(
+                        f"Epoch={epoch}/{nepochs} | Batch={i} | Batch loss={loss} | Batch Train Acc={train_acc_batch}"
+                    )
 
             self.model.eval_mode()
+
             current_cost = np.mean(epoch_costs)
-            self.costs.append(current_cost)
-
-            # train_labels = neuroeval.convert_prob_to_label(Y_train)
-            # train_predicted_labels = neuroeval.convert_prob_to_label(
-            #     self.model.feed_forward(X_train)
-            # )
-
-            train_acc = (
-                np.sum(
-                    np.argmax(
-                        self.model.predict(X_train.reshape(X_train.shape[0], -1)),
-                        axis=1,
-                    )
-                    == np.argmax(Y_train, axis=1)
-                )
-                / X_train.shape[0]
+            train_acc = self.evaluator.calculate_accuracy(
+                Y_train, self.model.predict(X_train)
             )
-            # train_acc = self.evaluator.calculate_accuracy(
-            #     train_labels, train_predicted_labels
-            # )
-
-            # test_labels = neuroeval.convert_prob_to_label(Y_test)
-            # test_predicted_labels = neuroeval.convert_prob_to_label(
-            #     self.model.feed_forward(X_test)
-            # )
-            # test_acc = self.evaluator.calculate_accuracy(
-            #     test_labels, test_predicted_labels
-            # )
-            test_acc = (
-                np.sum(
-                    np.argmax(
-                        self.model.predict(X_test.reshape(X_test.shape[0], -1)), axis=1
-                    )
-                    == np.argmax(Y_test, axis=1)
-                )
-                / X_test.shape[0]
+            history["train"].append(
+                EvalData(epoch=epoch, accuracy=train_acc, loss=current_cost)
             )
-            if self.debug:
-                logger.debug(
-                    f"Epoch={epoch} | Epoch Cost={current_cost} | Train Acc={train_acc} | Test Acc={test_acc} | Delta time={time.time()-start}"
-                )
 
-        # self.training_losses += losses
+            predicted_val = self.model.predict(X_val)
+            val_loss = self.loss.loss(Y_val, predicted_val)
+            val_acc = self.evaluator.calculate_accuracy(Y_val, predicted_val)
+            history["val"].append(
+                EvalData(epoch=epoch, accuracy=val_acc, loss=val_loss)
+            )
+
+            logger.debug(
+                f"Epoch={epoch}/{nepochs} | Epoch Train Cost={current_cost} | | Epoch Val Cost={val_loss} | Train Acc={train_acc} | Val Acc={val_acc} | Delta time={time.time()-start}"
+            )
+
+        test_acc = self.evaluator.calculate_accuracy(Y_test, self.model.predict(X_test))
+        history["test"] = EvalData(epoch=epoch, accuracy=test_acc)
+        logger.info(
+            f"After training | Epoch={epoch}/{nepochs} | Final cost={losses[-1]} | Train Acc={train_acc} | Test Acc={test_acc} | Delta time={time.time()-grand_time}"
+        )
+
         return losses
 
 
@@ -110,6 +92,8 @@ class LogitsModelTrainer(AbstractModelTrainer):
         self,
         X_train: Tensor,
         Y_train: Tensor,
+        X_val: Tensor,
+        Y_val: Tensor,
         X_test: Tensor,
         Y_test: Tensor,
         nepochs: int,
@@ -126,7 +110,9 @@ class LogitsModelTrainer(AbstractModelTrainer):
 
         logger.info(f"Training | nepochs={nepochs} | batch_size={batch_size}")
         losses = []
-        for epoch in range(nepochs):
+        grand_time = time.time()
+        history = dict(train=[], val=[], test=EvalData.default_empty())
+        for epoch in range(1, nepochs + 1):
             self.model.train_mode()
             if epoch_shuffle:
                 X_train, Y_train = self._shuffle(X_train, Y_train)
@@ -146,40 +132,44 @@ class LogitsModelTrainer(AbstractModelTrainer):
                 loss = self.loss.loss(y_batch, logits)
                 epoch_costs.append(loss)
 
+                if self.debug:
+                    train_acc_batch = self.evaluator.calculate_accuracy(
+                        y_batch, Softmax()(self.model.predict(x_batch))
+                    )
+                    logger.debug(
+                        f"Epoch={epoch}/{nepochs} | Batch={i} | Batch loss={loss} | Batch Train Acc={train_acc_batch}"
+                    )
+
             self.model.eval_mode()
+
             current_cost = np.mean(epoch_costs)
-            self.costs.append(current_cost)
-
-            train_acc = (
-                np.sum(
-                    np.argmax(
-                        Softmax()(self.model.predict(X_train)),
-                        axis=1,
-                    )
-                    == np.argmax(Y_train, axis=1)
-                )
-                / X_train.shape[0]
+            train_acc = self.evaluator.calculate_accuracy(
+                Y_train, Softmax()(self.model.predict(X_train))
+            )
+            history["train"].append(
+                EvalData(epoch=epoch, accuracy=train_acc, loss=current_cost)
             )
 
-            test_acc = (
-                np.sum(
-                    np.argmax(
-                        Softmax()(
-                            self.model.predict(X_test.reshape(X_test.shape[0], -1))
-                        ),
-                        axis=1,
-                    )
-                    == np.argmax(Y_test, axis=1)
-                )
-                / X_test.shape[0]
+            predicted_val = self.model.predict(X_val)
+            val_loss = self.loss.loss(Y_val, predicted_val)
+            val_acc = self.evaluator.calculate_accuracy(Y_val, Softmax()(predicted_val))
+            history["val"].append(
+                EvalData(epoch=epoch, accuracy=val_acc, loss=val_loss)
             )
-            if self.debug:
-                logger.debug(
-                    f"Epoch={epoch} | Epoch Cost={current_cost} | Train Acc={train_acc} | Test Acc={test_acc} | Delta time={time.time()-start}"
-                )
+
+            logger.info(
+                f"Epoch={epoch}/{nepochs} | Epoch Train Cost={current_cost} | | Epoch Val Cost={val_loss} | Train Acc={train_acc} | Val Acc={val_acc} | Delta time={time.time()-start}"
+            )
 
         # self.training_losses += losses
-        return losses
+        test_acc = self.evaluator.calculate_accuracy(
+            Y_test, Softmax()(self.model.predict(X_test))
+        )
+        history["test"] = EvalData(epoch=epoch, accuracy=test_acc)
+        logger.info(
+            f"After training | Epoch={epoch}/{nepochs} | Final cost={losses[-1] if losses else None} | Train Acc={train_acc} | Test Acc={test_acc} | Delta time={time.time()-grand_time}"
+        )
+        return history
 
 
 def main():

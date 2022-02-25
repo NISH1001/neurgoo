@@ -15,7 +15,14 @@ class MeanSquaredError(AbstractLoss):
         return predicted - actual
 
 
-class CrossEntropyLoss(AbstractLoss):
+class BinaryCrossEntropyLoss(AbstractLoss):
+    """
+    This is the implementation of binary-cross entropy loss.
+    This assumes that there are only two-classes.
+    That is: while we need to minimize loss for same class (say 1),
+    we need to maximize loss for another (say 0)
+    """
+
     _zero_clipper = 1e-15
 
     def loss(self, actual: Tensor, predicted: Tensor) -> Tensor:
@@ -31,10 +38,23 @@ class CrossEntropyLoss(AbstractLoss):
     def gradient(self, actual: Tensor, predicted: Tensor) -> Tensor:
         zc = self._zero_clipper
         return -(actual / (predicted + zc)) + (1 - actual) / (1 - predicted + zc)
-        # return -actual / (predicted + zc)
 
 
 class CrossEntropyLossWithLogits(AbstractLoss):
+    """
+    This is a cross-entropy loss for k-class classification.
+    Actually, this loss takes in raw logits (output from linear layer),
+    and then applies softmax, and finally computes loss.
+
+    We use this as the gradient flow is simple when we merge softmax+cross-entropy
+    into single loss.
+
+    Note:
+        - This loss is only used while training using trainer
+        `neurgoo.trainers.LogitsModelTrainer`
+        - The model shouldn't have any activation layer at the last layer.
+    """
+
     _zero_clipper = 1e-15
 
     def loss(self, actual: Tensor, logits: Tensor) -> Tensor:

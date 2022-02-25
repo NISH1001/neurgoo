@@ -293,15 +293,22 @@ class AbstractModelTrainer(BaseMixin, ABC):
             )
         self.optimizer = optimizer
 
+        if not isinstance(evaluator, Evaluator):
+            raise TypeError(
+                f"Invalid type for evaluator. Expected type of Evaluator. Got {type(evaluator)}"
+            )
+        self.evaluator = evaluator
+
         self.training_losses = []
         self.costs = []
-        self.evaluator = evaluator
 
     @abstractmethod
     def fit(
         self,
         X_train: Tensor,
         Y_train: Tensor,
+        X_val: Tensor,
+        Y_val: Tensor,
         X_test: Tensor,
         Y_test: Tensor,
         nepochs: int,
@@ -313,6 +320,8 @@ class AbstractModelTrainer(BaseMixin, ABC):
         self,
         X_train: Tensor,
         Y_train: Tensor,
+        X_val: Tensor,
+        Y_val: Tensor,
         X_test: Tensor,
         Y_test: Tensor,
         nepochs: int,
@@ -321,6 +330,8 @@ class AbstractModelTrainer(BaseMixin, ABC):
         raise self.fit(
             X_train=X_train,
             Y_train=Y_train,
+            X_val=X_val,
+            Y_val=Y_val,
             X_test=X_test,
             Y_test=Y_test,
             nepochs=nepochs,
