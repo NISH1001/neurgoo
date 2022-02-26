@@ -46,7 +46,7 @@ class CrossEntropyLossWithLogits(AbstractLoss):
     Actually, this loss takes in raw logits (output from linear layer),
     and then applies softmax, and finally computes loss.
 
-    We use this as the gradient flow is simple when we merge softmax+cross-entropy
+    We use this as the gradient is simple when we merge softmax+cross-entropy
     into single loss.
 
     Note:
@@ -64,6 +64,28 @@ class CrossEntropyLossWithLogits(AbstractLoss):
 
     def gradient(self, actual: Tensor, logits: Tensor) -> Tensor:
         return Softmax()(logits) - actual
+
+
+class HingeLoss(AbstractLoss):
+    """
+    This is the loss which works on un-activated/normalized values.
+    That is: it works on logits.
+
+    So:
+        - First, figure out which logits/classes have larger margin (<1) w.r.t the
+        actual class
+        - Then, compute losses w.r.t those logits.
+        - Suppose the data belongs to class **j**.
+        - We want $$\hat{y_{j}}$$ to be at least **one larger**
+        than any other $$\hat{y_{i}}, i \neq j$$
+    """
+
+    def loss(self, actual: Tensor, logits: Tensor) -> Tensor:
+        temp = logits - np.sum(actual * logits, axis=1).reshape(-1, 1) + 1
+        return np.mean(np.sum(temp * (temp > 0) * (actual != 1), axis=1))
+
+    def gradient(self, actual: Tensor, logits: Tensor) -> Tensor:
+        return np.where(logits * (2 * actual - 1) < 1, -(2 * actual - 1), 0)
 
 
 def main():

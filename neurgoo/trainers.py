@@ -7,7 +7,7 @@ from loguru import logger
 
 from ._base import AbstractModelTrainer
 from .layers.activations import ActivationLayer, Softmax
-from .losses import CrossEntropyLossWithLogits
+from .losses import CrossEntropyLossWithLogits, HingeLoss
 from .misc.eval import EvalData
 from .structures import Tensor, TensorArray
 
@@ -103,10 +103,10 @@ class LogitsModelTrainer(AbstractModelTrainer):
         if isinstance(self.model.layers[-1], ActivationLayer):
             raise TypeError(
                 "To use this trainer, make sure  that last layer of the model shouldn't have any activation."
-                + " This trainer only accepts neurgoo.losses.CrossEntropyLossWithLogits!"
+                + " This trainer only accepts neurgoo.losses.CrossEntropyLossWithLogits or neurgoo.losses.HingeLoss!"
                 + " Maybe you want to use neurgoo.trainer.DefaultModelTrainer"
             )
-        assert isinstance(self.loss, CrossEntropyLossWithLogits)
+        assert isinstance(self.loss, (CrossEntropyLossWithLogits, HingeLoss))
 
         logger.info(f"Training | nepochs={nepochs} | batch_size={batch_size}")
         losses = []
