@@ -77,17 +77,49 @@ class Linear(AbstractLayer):
         return self.initialize_uniform()
 
     def initialize_gaussian(self, variance: float = 1.0) -> Linear:
-        self.W.val = np.random.randn(self.in_features, self.num_neurons) * (
-            variance ** 0.5
+        self.W.val = np.random.normal(
+            loc=0, scale=variance ** 0.5, size=(self.in_features, self.num_neurons)
         )
+        # self.W.val = np.random.randn(self.in_features, self.num_neurons) * (
+        #     variance ** 0.5
+        # )
+        self.b.val = np.zeros((1, self.num_neurons))
+        return self
+
+    def initialize_xavier(self) -> Linear:
+        """
+        Xavier initialization.
+
+        Note:
+            Var(W) = 2/(fan_in + fan_out)
+
+            where,
+                fan_in = number of input features
+                fan_out = number of output features (neurons)
+        """
+        variance = 2 / (self.in_features + self.num_neurons)
+        self.W.val = np.random.normal(
+            loc=0, scale=variance ** 0.5, size=(self.in_features, self.num_neurons)
+        )
+        # self.W.val = np.random.randn(self.in_features, self.num_neurons) * (
+        #     variance ** 0.5
+        # )
         self.b.val = np.zeros((1, self.num_neurons))
         return self
 
     def initialize_uniform(self) -> Linear:
+        """
+        This only has fan_in
+        """
         limit = 1 / np.sqrt(self.in_features)
         self.W.val = np.random.uniform(
             -limit, limit, (self.in_features, self.num_neurons)
         )
+        self.b.val = np.zeros((1, self.num_neurons))
+        return self
+
+    def initialize_random(self) -> Linear:
+        self.W.val = np.random.rand((self.in_features, self.num_neurons))
         self.b.val = np.zeros((1, self.num_neurons))
         return self
 
