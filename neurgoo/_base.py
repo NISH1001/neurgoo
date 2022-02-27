@@ -246,6 +246,8 @@ class AbstractModel(AbstractLayer):
             as we don't have to store any input cache as we don't do backpropagate
             during evaluation only mode.
         2) `train_mode()` enables the training and input cache
+
+    See `neurgoo.models.DefaultNNModel` for current implementation.
     """
 
     def __init__(
@@ -344,6 +346,8 @@ class AbstractOptimizer(BaseMixin, ABC):
     For any subsequent optimizer implementation, we should implement their
     `step(...)` method where we access trainable params and update  their
     values accordingly.
+
+    See `neurgoo.optimizers.SGD` for current implementation.
     """
 
     def __init__(
@@ -379,6 +383,8 @@ class AbstractModelTrainer(BaseMixin, ABC):
     """
     This component encapsulates all the main training loop,
     through `fit(...)` method.
+
+    See `neurgoo.trainers.DefaultModelTrainer` class for current implementation.
     """
 
     def __init__(
@@ -454,6 +460,9 @@ class AbstractModelTrainer(BaseMixin, ABC):
         )
 
     def _shuffle(self, X: Tensor, Y: Tensor) -> Tuple[Tensor]:
+        """
+        Randomly shuffles X and Y
+        """
         indices = list(range(len(X)))
         random.shuffle(indices)
         return X[indices], Y[indices]

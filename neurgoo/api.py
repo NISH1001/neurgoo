@@ -9,4 +9,4 @@ from .losses import (
 from .models import DefaultNNModel
 from .optimizers import SGD
 from .structures import Tensor, TensorArray
-from .trainers import DefaultModelTrainer, LogitsModelTrainer
+from .trainers import DefaultModelTrainer

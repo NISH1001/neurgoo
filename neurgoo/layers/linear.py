@@ -44,6 +44,26 @@ class Linear(AbstractLayer):
             all `OptimParam` parameters during optimization step.
             In this case, setting to `False` doesn't allow
             the layer's weights and biases to be updated during training.
+
+    Different initialization methods:
+        - `initialize_gaussian(variance=...)` initializes weights from normal  distribution
+        with specified variance
+        - `initialize_xavier()` does xavier initialization
+        - `initialize_random()` does random weight initialization
+        - `initialize_random()` initializes weights from a uniform
+        distribution
+
+    All these initialiation method represents the object itself  (see  ``return self``).
+    Which means, we can access these through layer object and directly add to model.
+        Example:
+
+            .. code-block:: python
+
+                model = DefaultNNModel()
+                model.add_layer(Linear(...).initialize_random())
+                model.add_layer(Linear(...).initialize_gaussian(variance=1.0))
+
+        This is loosely like a builder design pattern which I am fan of!
     """
 
     def __init__(
