@@ -139,7 +139,7 @@ class Linear(AbstractLayer):
         return self
 
     def initialize_random(self) -> Linear:
-        self.W.val = np.random.rand((self.in_features, self.num_neurons))
+        self.W.val = np.random.rand(self.in_features, self.num_neurons)
         self.b.val = np.zeros((1, self.num_neurons))
         return self
 
