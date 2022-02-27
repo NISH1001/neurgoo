@@ -14,6 +14,10 @@ def convert_prob_to_label(y):
 
 @dataclass
 class EvalData:
+    """
+    Container to store tracking info while training
+    """
+
     epoch: int
     accuracy: float
     precision: float = -1
