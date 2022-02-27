@@ -23,6 +23,10 @@ class AbstractLayer(BaseMixin, ABC):
     This represent an abstract layer from which
     downstream layer classes are implemented
 
+    Two main attributes of any layer is to perform:
+        - forward pass (see `feed_forward(...)`)
+        - back propagation (see `backpropagate(...)`)
+
     Note:
         Layers could be:
             - neuron layer
@@ -99,7 +103,69 @@ class AbstractLayer(BaseMixin, ABC):
         return f"{self.__classname__} || Shape: ({self.input_shape}, {self.output_shape}) || trainable: {self.trainable}"
 
 
+class ActivationLayer(AbstractLayer):
+    """
+    This class represents an activation layer.
+
+    Some of the implementation can be found at `neurgoo.layers.activations`:
+        - `neurgoo.layers.activations.Sigmoid`
+        - `neurgoo.layers.activations.ReLU`
+        - `neurgoo.layers.activations.LeakyReLU`
+        - `neurgoo.layers.activations.Softmax`
+
+    Each activation layer has 2 primary attributes which should be implemented:
+        - `__call__(...)` method which acts as a functor, and allows us to do object
+        calls
+        - `gradient(...)` which computes the gradient w.r.t input to the
+        function. Down the line this is used in `backpropagate(...)` method
+
+    """
+
+    def __init__(self):
+        self._input_cache = NULL_TENSOR.copy()
+        self.mode = "train"
+
+    def initialize(self):
+        pass
+
+    def feed_forward(self, x):
+        if self.mode == "train":
+            self._input_cache = x
+            self.trainable = True
+        elif self.mode == "eval":
+            self.trainable = False
+        return self(x)
+
+    def __call__(self, x):
+        raise NotImplementedError()
+
+    def backpropagate(self, grad_accum: Tensor) -> Tensor:
+        return grad_accum * self.gradient(self._input_cache)
+
+    def gradient(self, x: Tensor) -> Tensor:
+        raise NotImplementedError()
+
+    def __str__(self) -> str:
+        return f"{self.__classname__} || Attrs => {self.__dict__}"
+
+
 class AbstractLoss(BaseMixin, ABC):
+    """
+    This class represents loss component of the neural network system.
+
+    Any implementation of the loss should have 2 main attributes:
+        - `loss`, which computes the loss when target and predictions are
+        given
+        - `gradient` which computes the gradient required for
+        `backpropagate(...)` methods
+
+    Current implementations:
+        - `neurgoo.losses.MeanSquaredError`
+        - `neurgoo.losses.BinaryCrossEntropyLoss`
+        - `neurgoo.losses.CrossEntropyLossWithLogits`
+        - `neurgoo.losses.HingeLoss`
+    """
+
     def __init__(self, name: Optional[str] = None) -> None:
         name = name or self.__classname__
 
@@ -122,6 +188,23 @@ class OptimParam(BaseMixin):
     """
     Represents a parameter type that any optimizer can affect
     for gradient update step.
+
+    This is a very naive-implementation to make sure we have loose
+    segregation between layer, backpropagation and optimizer.
+
+    Currently we have weights and biases as two `OptimParam` object
+    at `neurgoo.layers.Linear`.
+
+    Also, when we do `model.params()`, we are basically
+    getting references to layer's OptimParam variables.
+    These params are passed to any optimizer to perform gradient update operation.
+
+    Attributes:
+        `val`: ``np.ndarray` aliased as `Tensor`
+            This stores actual array
+        ``grad``: ``Tensor``
+            This stores delta value to be used for updating `val`
+            in the optimizer
     """
 
     def __init__(
@@ -148,6 +231,25 @@ class OptimParam(BaseMixin):
 
 
 class AbstractModel(AbstractLayer):
+    """
+    This is an abstraction for a collection of layers.
+    In this we can:
+        - add any number of layers
+        - do forward pass (calls feed_forward method of each layer
+        iteratively)
+        - do backward pass (calls backpropagate method of each layer
+        iteratively)
+
+    Note:
+        1) `eval_mode()` disables any trainable param
+            and also avoids caching of input. This is for memory optimization
+            as we don't have to store any input cache as we don't do backpropagate
+            during evaluation only mode.
+        2) `train_mode()` enables the training and input cache
+
+    See `neurgoo.models.DefaultNNModel` for current implementation.
+    """
+
     def __init__(
         self,
         layers: Optional[Sequence[Type[AbstractLayer]]] = None,
@@ -207,6 +309,10 @@ class AbstractModel(AbstractLayer):
         return self.feed_forward(X)
 
     def params(self) -> Tuple[OptimParam]:
+        """
+        Return a collection of all the ``OptimParam``
+        object stored in any layer.
+        """
         res = []
         for layer in self.layers:
             for var, t in layer.__dict__.items():
@@ -236,6 +342,14 @@ class AbstractModel(AbstractLayer):
 
 
 class AbstractOptimizer(BaseMixin, ABC):
+    """
+    For any subsequent optimizer implementation, we should implement their
+    `step(...)` method where we access trainable params and update  their
+    values accordingly.
+
+    See `neurgoo.optimizers.SGD` for current implementation.
+    """
+
     def __init__(
         self, params: Tuple[OptimParam], lr: float = 1e-3, debug: bool = False
     ) -> None:
@@ -266,6 +380,13 @@ class AbstractOptimizer(BaseMixin, ABC):
 
 
 class AbstractModelTrainer(BaseMixin, ABC):
+    """
+    This component encapsulates all the main training loop,
+    through `fit(...)` method.
+
+    See `neurgoo.trainers.DefaultModelTrainer` class for current implementation.
+    """
+
     def __init__(
         self,
         model: Type[AbstractModel],
@@ -339,6 +460,9 @@ class AbstractModelTrainer(BaseMixin, ABC):
         )
 
     def _shuffle(self, X: Tensor, Y: Tensor) -> Tuple[Tensor]:
+        """
+        Randomly shuffles X and Y
+        """
         indices = list(range(len(X)))
         random.shuffle(indices)
         return X[indices], Y[indices]

@@ -31,14 +31,27 @@ def plot_history(
     if not MATPLOTLIB:
         logger.error("Maplotlib not installed. Halting the plot process!")
         return
+
     train = history.get("train", [])
     val = history.get("val", [])
+
+    # get epoch data common to both
+    t_epochs = list(map(lambda e: e.epoch, train))
+    v_epochs = list(map(lambda e: e.epoch, val))
+    epochs = set(t_epochs).intersection(v_epochs)
+
+    train = filter(lambda e: e.epoch in epochs, train)
+    train = sorted(train, key=lambda e: e.epoch)
+
+    val = filter(lambda e: e.epoch in epochs, val)
+    val = sorted(val, key=lambda e: e.epoch)
+
     plt.figure(figsize=figure_size)
     plt.plot([getattr(data, plot_type) for data in train])
     plt.plot([getattr(data, plot_type) for data in val])
     plt.legend([f"Train {plot_type}", f"Val {plot_type}"])
-    plt.ylabel(f"{plot_type}")
     plt.xlabel("epoch")
+    plt.ylabel(f"{plot_type}")
 
 
 def main():

@@ -1,40 +1,9 @@
 #!/usr/bin/env python3
 
-from typing import Optional
-
 import numpy as np
 
-from .._base import AbstractLayer, BaseMixin
-from ..structures import NULL_TENSOR, Tensor
-
-
-class ActivationLayer(AbstractLayer):
-    def __init__(self):
-        self._input_cache = NULL_TENSOR.copy()
-        self.mode = "train"
-
-    def initialize(self):
-        pass
-
-    def feed_forward(self, x):
-        if self.mode == "train":
-            self._input_cache = x
-            self.trainable = True
-        elif self.mode == "eval":
-            self.trainable = False
-        return self(x)
-
-    def __call__(self, x):
-        raise NotImplementedError()
-
-    def backpropagate(self, grad_accum: Tensor) -> Tensor:
-        return grad_accum * self.gradient(self._input_cache)
-
-    def gradient(self, x: Tensor) -> Tensor:
-        raise NotImplementedError()
-
-    def __str__(self) -> str:
-        return f"{self.__classname__} || Attrs => {self.__dict__}"
+from .._base import ActivationLayer
+from ..structures import Tensor
 
 
 class Sigmoid(ActivationLayer):
@@ -75,8 +44,8 @@ class Softmax(ActivationLayer):
     _zero_clipper = 1e-13
 
     def __call__(self, x: Tensor) -> Tensor:
-        sx = x - np.max(x, axis=1).reshape(-1, 1)
-        exps = np.exp(sx)
+        # for stability, perform this substraction
+        exps = np.exp(x - np.max(x, axis=1).reshape(-1, 1))
         return exps / np.sum(exps, axis=1).reshape(-1, 1)
 
     def gradient(self, x: Tensor) -> Tensor:
