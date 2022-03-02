@@ -18,7 +18,7 @@ setup(
     author="Nish",
     author_email="nishanpantha@gmail.com, np0069@uah.edu",
     license="MIT",
-    python_requires=">=3.8",
+    python_requires=">=3.6",
     packages=["neurgoo", "neurgoo.layers", "neurgoo.misc"],
     install_requires=required,
     classifiers=[
