@@ -85,7 +85,27 @@ class HingeLoss(AbstractLoss):
         return np.mean(np.sum(temp * (temp > 0) * (actual != 1), axis=1))
 
     def gradient(self, actual: Tensor, logits: Tensor) -> Tensor:
-        return np.where(logits * (2 * actual - 1) < 1, -(2 * actual - 1), 0)
+        """
+        The gradient is computed tentatively as:
+            For every low margin (<1) from target class K to other
+            classes 'j',
+            we accumulate negative gradients to the target class.
+            And we add positive gradient to classes 'j'.
+
+            So, final result is a zero-sum.
+
+        """
+        temp = logits - np.sum(actual * logits, axis=1).reshape(-1, 1) + 1
+        dist = np.maximum(temp, np.zeros_like(temp))
+        vals = (dist > 0) * (actual != 1)
+
+        # for target class K
+        grad1 = (-1) * np.sum(vals, axis=1).reshape(-1, 1) * actual
+
+        # for other classses where margin is <1 w.r.t K
+        grad2 = ((dist > 0) * (actual != 1)).astype(int)
+
+        return (grad1 + grad2) / len(logits)
 
 
 def main():
